@@ -13,7 +13,7 @@ fred_indicators = {
     'FEDFUNDS': '기준금리',  # 연방기금 금리 (월간): 연방준비제도가 설정한 단기 금리로, 소비와 투자, 경제 활동 전반에 영향을 미칩니다.
     'UMCSENT': '미시간대 소비자 심리지수',  # 소비자 신뢰 지수 (월간): 소비자들이 경제를 얼마나 낙관적으로 바라보는지를 측정하는 지표로, 소비 지출의 선행 지표 역할을 합니다.
     'UNRATE': '실업률',  # 실업률 (월간): 노동 시장의 상태를 나타내는 핵심 지표로, 경제 성장 및 경기 둔화의 주요 신호로 활용됩니다.
-    'USREC': '경기침체',  # 경기침체 지수 (월간): 미국 경제가 경기 침체 상태에 있는지를 나타냅니다. 일반적으로 장단기 금리차(T10Y2Y)를 통해도 간접적으로 파악 가능합니다.
+    # 'USREC': '경기침체',  # 경기침체 지수 (월간): 미국 경제가 경기 침체 상태에 있는지를 나타냅니다. 일반적으로 장단기 금리차(T10Y2Y)를 통해도 간접적으로 파악 가능합니다.
     'DGS2': '2년 만기 미국 국채 수익률',  # 2년 만기 국채 수익률 (일간): 단기 국채 수익률로, 시장이 예측하는 단기 금리 동향과 통화 정책 방향을 반영합니다.
     'DGS10': '10년 만기 미국 국채 수익률',  # 10년 만기 국채 수익률 (일간): 장기 국채 수익률로, 경제의 장기 성장성과 인플레이션 기대를 반영합니다.
 
@@ -51,7 +51,7 @@ fred_indicators = {
     # 'DRBLACBS': '대출 연체율',  # 기업 대출의 연체율 (분기): 기업 대출의 연체 비율을 나타내며, 금융 시장의 신용 위험을 평가합니다.
 
     # 주식시장 관련 추가 지표
-    'DJIA': '다우존스 산업평균지수',  # 미국 대형 30개 기업의 주가 평균 (일간): 미국 주식 시장의 전반적인 흐름을 반영하며, 대형주의 안정성을 평가하는 지표입니다.
+    # 'DJIA': '다우존스 산업평균지수',  # 미국 대형 30개 기업의 주가 평균 (일간): 미국 주식 시장의 전반적인 흐름을 반영하며, 대형주의 안정성을 평가하는 지표입니다.
     'NASDAQCOM': '나스닥 종합지수'  # 나스닥 시장 전체 종합 주가 지수 (일간): 기술주 중심의 주식 시장 동향을 나타냅니다.
 }
 
@@ -113,7 +113,7 @@ end_date = datetime.today().strftime('%Y-%m-%d')
 fred_data_frames = []
 for code, name in fred_indicators.items():
     # 지표별 제공 주기에 따른 요청 주기를 설정
-    if code in ['FEDFUNDS', 'UMCSENT', 'USREC', 'PCE', 'INDPRO', 'HOUST', 'UNNEMPLOY',
+    if code in ['FEDFUNDS', 'UMCSENT', 'PCE', 'INDPRO', 'HOUST', 'UNNEMPLOY',
     'RSAFS', 'CPIENGSL', 'AHETPI', 'PPIACO', 'CPIAUCSL', 'CSUSHPINSA', 'DTWEXM', 'UNRATE']:
         frequency = 'm' # 월간
     elif code in ['STLFSI4', 'M2', 'MORTGAGE15US', 'MORTGAGE5US']:
@@ -200,14 +200,23 @@ if all_data_frames:
     
     # 결측치 및 비정상적인 값을 처리
     result_df.replace('.', pd.NA, inplace=True)
+    result_df = result_df.dropna(subset=['10년 기대 인플레이션율', '장단기 금리차', '금융스트레스지수', '5년 변동금리 모기지'], how='any')
     
     # 결측치를 이전 값으로 채우기
     result_df.sort_index(inplace=True)
     result_df.fillna(method='ffill', inplace=True)
     
-    # CSV 파일로 저장
-    csv_path = 'total.csv'
-    result_df.to_csv(csv_path, index_label='날짜')
+    # # 특정 열에서 결측치가 있는 행 제거 
+    # result_df = result_df.dropna(subset=['S&P 500 지수'])
     
+    # CSV 파일로 저장
+    try:
+        csv_path = f'total.csv'
+        result_df.to_csv(csv_path, index_label='날짜', encoding='utf-8-sig')
+        print('저장 완료')
+    except:
+        csv_path = f'total.csv'
+        result_df.to_csv(csv_path, index_label='날짜', encoding='utf-8-sig')
+        print('저장 완료')
 else:
     print("저장 할 데이터가 없음")
