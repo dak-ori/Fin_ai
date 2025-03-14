@@ -166,7 +166,7 @@ for i, df in enumerate(fred_data_frames):
         else:
             fred_data_frames[i] = df.resample('D').ffill()
     except Exception as e:
-        print(f"Error {i} : {e}")
+        print(f"Error {i} : {e}")      
 
 # CSV 파일 형식으로 저장
 if fred_data_frames:
@@ -175,3 +175,25 @@ if fred_data_frames:
     print("저장 완료")
 else:
     print("저장 할 데이터 없음")
+
+# yfinance 를 통한 데이터 수집
+yfinance_data_frames = []
+for name, ticker in yfinance_indicators.items():
+    df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
+    if not df.empty:
+        df = df[['Close']].rename(columns={'Close' : name}) # 종가 값만 추출
+        df.index = df.index.tz_localize(None)
+        yfinance_data_frames.append(df)
+    else:
+        print(f"No data {name} ({ticker})")
+
+# CSV 파일 형식으로 저장
+if yfinance_data_frames:
+    merged_df = pd.concat(yfinance_data_frames, axis=1) # 데이터 배열들을 concat으로 통합
+    merged_df.to_csv('fred_data_yf.csv', index=True, encoding='utf-8-sig')
+    print("저장 완료")
+else:
+    print("저장 할 데이터 없음")
+    
+
+
