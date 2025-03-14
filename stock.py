@@ -106,7 +106,7 @@ nasdaq_top_100 = [
     # ("LULU", "룰루레몬"), ("EBAY", "이베이"), ("CEG", "컨스텔레이션 에너지"), ("RIVN", "리비안")
 ]
 
-start_date = '2006-01-01'
+start_date = '2016-01-01'
 end_date = datetime.today().strftime('%Y-%m-%d')
 
 fred_data_frames = []
@@ -114,13 +114,13 @@ for code, name in fred_indicators.items():
     # 지표별 제공 주기에 따른 요청 주기를 설정
     if code in ['FEDFUNDS', 'UMCSENT', 'USREC', 'PCE', 'INDPRO', 'HOUST', 'UNNEMPLOY',
     'RSAFS', 'CPIENGSL', 'AHETPI', 'PPIACO', 'CPIAUCSL', 'CSUSHPINSA', 'DTWEXM', 'UNRATE']:
-        frequency = 'm' 
+        frequency = 'm' # 월간
     elif code in ['STLFSI4', 'M2', 'MORTGAGE15US', 'MORTGAGE5US']:
-        frequency = 'w' # 주기
+        frequency = 'w' # 주간
     elif code in ['TDSP', 'A939RX0Q04BSBEA', 'GDPC1', 'W019RCQ027SBEA', 'DRBLACBS']:
         frequency = 'q' # 분기
     else:
-        frequency = 'd'
+        frequency = 'd' # 일간
 
     url = f'https://api.stlouisfed.org/fred/series/observations'
     params = {
@@ -134,6 +134,7 @@ for code, name in fred_indicators.items():
 
     response = requests.get(url, params=params)
 
+    # 데이터를 DateFrame 으로 변환 후 날짜를 인덱스로 설정하여 리스트에 추가하는 코드
     if response.status_code == 200:
         data = response.json().get('observations', [])
         if data:
@@ -146,10 +147,31 @@ for code, name in fred_indicators.items():
     else:
             print(f"fail {name} {(code)} : {response.status_code}")
 
+# 데이터 빈도에 따른 리샘플링
+for i, df in enumerate(fred_data_frames):
+    if df.empty:
+        print(f"DataFrame {i} is Empty")
+        continue
+
+    try:
+        inferred_freq = df.index.inferred_freq
+        if inferred_freq in ['M', 'MS']: # 월간
+            fred_data_frames[i] = df.resample('D').ffill()
+        if inferred_freq in ['W', 'W-FRI']: # 주간
+            fred_data_frames[i] = df.resample('D').ffill()
+        if inferred_freq in ['Q', 'Q5-QCT']: # 분기
+            fred_data_frames[i] = df.resample('D').ffill()
+        if inferred_freq in ['B']: # 일간
+            fred_data_frames[i] = df.resample('D').ffill()
+        else:
+            fred_data_frames[i] = df.resample('D').ffill()
+    except Exception as e:
+        print(f"Error {i} : {e}")
+
 # CSV 파일 형식으로 저장
 if fred_data_frames:
-    merged_df = pd.concat(fred_data_frames, axis=1)
-    merged_df.to_csv('fred_data.csv', index=True, encoding='uft-8-sig')
+    merged_df = pd.concat(fred_data_frames, axis=1) # 데이터 배열들을 concat으로 통합
+    merged_df.to_csv('fred_data.csv', index=True, encoding='utf-8-sig')
     print("저장 완료")
 else:
     print("저장 할 데이터 없음")
