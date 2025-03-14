@@ -78,7 +78,8 @@ nasdaq_top_100 = [
     , ("CMCSA", "컴캐스트"), ("PEP", "펩시코"),
     ("INTC", "인텔"), ("CSCO", "시스코"), ("AVGO", "브로드컴"), ("TXN", "텍사스 인스트루먼트"),
     ("QCOM", "퀄컴"), ("COST", "코스트코"), ("AMGN", "암젠")
-
+    
+    # 상위 100개의 정보를 원하면 아래의 주석을 해제
     # , ("CHTR", "차터 커뮤니케이션"),
     # ("SBUX", "스타벅스"), ("AMD", "AMD")
     # , ("MDLZ", "몬델리즈"), ("INTU", "인트윗"),
@@ -168,14 +169,6 @@ for i, df in enumerate(fred_data_frames):
     except Exception as e:
         print(f"Error {i} : {e}")      
 
-# CSV 파일 형식으로 저장
-if fred_data_frames:
-    merged_df = pd.concat(fred_data_frames, axis=1) # 데이터 배열들을 concat으로 통합
-    merged_df.to_csv('fred_data.csv', index=True, encoding='utf-8-sig')
-    print("저장 완료")
-else:
-    print("저장 할 데이터 없음")
-
 # yfinance 를 통한 데이터 수집
 yfinance_data_frames = []
 for name, ticker in yfinance_indicators.items():
@@ -187,13 +180,34 @@ for name, ticker in yfinance_indicators.items():
     else:
         print(f"No data {name} ({ticker})")
 
-# CSV 파일 형식으로 저장
-if yfinance_data_frames:
-    merged_df = pd.concat(yfinance_data_frames, axis=1) # 데이터 배열들을 concat으로 통합
-    merged_df.to_csv('fred_data_yf.csv', index=True, encoding='utf-8-sig')
-    print("저장 완료")
-else:
-    print("저장 할 데이터 없음")
+# 나스닥 상위 종목 데이터 수집
+nasdaq_data_frames = []
+for ticker, name in nasdaq_top_100:
+    df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
+    if not df.empty:
+        df = df[['Close']].rename(columns={'Close' : name})
+        df.index = df.index.tz_localize(None)
+        nasdaq_data_frames.append(df)
+    else:
+        print(f"No data {name} {(ticker)}")
+        
+# 데이터 병합
+all_data_frames = fred_data_frames + yfinance_data_frames + nasdaq_data_frames
+
+if all_data_frames:
+    # 결합
+    result_df = pd.concat(all_data_frames, axis=1, join='outer') # axis는 축의 방향, Join은 결합 방식 (outer는 외부결합방식으로 모든 날짜를 포함하되 없는 경우에는 None으로 채움)
     
-
-
+    # 결측치 및 비정상적인 값을 처리
+    result_df.replace('.', pd.NA, inplace=True)
+    
+    # 결측치를 이전 값으로 채우기
+    result_df.sort_index(inplace=True)
+    result_df.fillna(method='ffill', inplace=True)
+    
+    # CSV 파일로 저장
+    csv_path = 'total.csv'
+    result_df.to_csv(csv_path, index_label='날짜')
+    
+else:
+    print("저장 할 데이터가 없음")
