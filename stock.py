@@ -174,7 +174,9 @@ yfinance_data_frames = []
 for name, ticker in yfinance_indicators.items():
     df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
     if not df.empty:
-        df = df[['Close']].rename(columns={'Close' : name}) # 종가 값만 추출
+        # df = df[['Close']].rename(columns={'Close' : name}) # 종가 값만 추출
+        df = df[['Close']]
+        df.columns = [name] # rename 대신 직접 columns 할당
         df.index = df.index.tz_localize(None)
         yfinance_data_frames.append(df)
     else:
@@ -185,7 +187,9 @@ nasdaq_data_frames = []
 for ticker, name in nasdaq_top_100:
     df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
     if not df.empty:
-        df = df[['Close']].rename(columns={'Close' : name})
+        # df = df[['Close']].rename(columns={'Close' : name})
+        df = df[['Close']]
+        df.columns = [name] # rename 대신 직접 columns 할당
         df.index = df.index.tz_localize(None)
         nasdaq_data_frames.append(df)
     else:
