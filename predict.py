@@ -34,3 +34,27 @@ def transformer_encoder(inputs, num_heads, ff_dim, dropout=0.1):
     
     # 즉 Attention Output인 원본 특징이 보존되면서, 변환된 특징인 ffn_output을 추가
     return ffn_output
+
+# Transformer Model 정의
+# 이중 입력 모델 (주가 데이터, 경제 데이터, 멀티헤드어텐션의 헤드 개수, 피드포워드 차원, 타겟 사이즈)
+
+def build_transformer_with_two_inputs(stock_shape, econ_shape, num_heads, ff_dim, target_size):
+    stock_inputs = Input(shape=stock_shape) # Input으로 데이터를 입력받음음
+    stock_encoded = stock_inputs
+    for _ in range(4): # 4개의 Transforemr Layers
+        stock_encoded = transformer_encoder(stock_encoded, num_heads=num_heads, ff_dim=ff_dim) 
+    stock_encoded = Dense(64, activation='relu')(stock_encoded) # 64차원으로 특징을 압축 및 변환
+
+    econ_inputs = Input(shape=econ_shape)
+    econ_encoded = econ_inputs
+    for _ in range(4):
+        econ_encoded = transformer_encoder(econ_encoded, num_heads=num_heads, ff_dim=ff_dim)
+    econ_encoded = Dense(64, activation='relu')(econ_encoded)
+    
+    merged = Add()([stock_encoded, econ_encoded]) # 특징을 결합
+    merged = Dense(128, activation='relu')(merged) # 128노드의 Dense층으로 특징을 추출
+    merged = Dropout(0.2) # 과적합 방지
+    merged = GlobalAveragePooling1D()(merged) # 데이터 전체를 시계열 차원으로 압축
+    outputs = Dense(target_size)(merged) # 타겟사이즈 만큼 압축
+    
+    return Model(inputs=[stock_inputs, econ_inputs], outputs=outputs)
