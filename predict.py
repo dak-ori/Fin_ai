@@ -58,3 +58,13 @@ def build_transformer_with_two_inputs(stock_shape, econ_shape, num_heads, ff_dim
     outputs = Dense(target_size)(merged) # 타겟사이즈 만큼 압축
     
     return Model(inputs=[stock_inputs, econ_inputs], outputs=outputs)
+
+print("로딩 중..")
+file_path = '/content/drive/My drive/total.csv'
+data = pd.read_csv(file_path, parse_dates=['날짜']) # 날짜열을 데이터 타입으로 파싱
+data.sort_values(by='날짜', inplace=True) # 날짜열을 오름차순
+
+data.fillna(method='ffill', inplace=True) # 결측값을 앞의 값으로 채움
+data.fillna(method='bfill', inplace=True) # ffill에서 채우지 못한 값이 있으면, 다음 값으로 빈자리를 채움
+data = data.apply(pd.to_numeric, errors='coerce') # 데이터프레임의 모든 값을 숫자로 변경, 변환할 수 없는 값은 NaN값 
+data.dropna(inplace=True) # NaN값 제거
