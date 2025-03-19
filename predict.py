@@ -5,13 +5,11 @@ import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-
-from sklearn.preprocessing import MinMaxScaler # 주가 및 독립적인 데이터를 0에서 1범위로 정규화
+import tensorflow as tf
+from sklearn.preprocessing import MinMaxScaler # 주가 및 독립적인 데이터를 0에서 1범위로 정규화 / 사용하는 이유 : 딥러닝 모델에서 각 범위안에서 학습할 때 훨씬 안정적이기 때문
 from tensorflow.keras.models import Model # Model, Input, Dense는 신경망 구성 요소를 만들 때 사용
 from tensorflow.keras.layers import ( # 멀티 헤드 어텐션은 Transformer 모델의 핵심적인 계층
-    Input, Dense, Dropout, LayerNormalization, MultiHeadAttention, Add, GlobalAveragePooling1D)
-
-import tensorflow as tf
+    Input, Dense, Dropout, LayerNormalization, MultiHeadAttention, Add, GlobalAveragePooling1D) 
 from tensorflow.keras.optimizers import Adam
 
 # Transformer Encoder 정의
@@ -68,3 +66,95 @@ data.fillna(method='ffill', inplace=True) # 결측값을 앞의 값으로 채움
 data.fillna(method='bfill', inplace=True) # ffill에서 채우지 못한 값이 있으면, 다음 값으로 빈자리를 채움
 data = data.apply(pd.to_numeric, errors='coerce') # 데이터프레임의 모든 값을 숫자로 변경, 변환할 수 없는 값은 NaN값 
 data.dropna(inplace=True) # NaN값 제거
+
+forecast_horizon = 7 # 예측기간
+
+# target_columns = [
+#     '애플', '마이크로소프트', '아마존', '구글 A', '구글 C',
+#     '메타', '테슬라', '엔비디아', '페이팔', '어도비',
+#     '넷플릭스', '컴캐스트', '펩시코', '인텔', '시스코',
+#     '브로드컴', '텍사스 인스트루먼트', '퀄컴', '코스트코', '암젠'
+# ]
+
+target_columns = [
+    'QQQ ETF'
+]
+
+economic_features = [
+    '10년 기대 인플레이션율',
+    '장단기 금리차',
+    '기준금리',
+    '미시간대 소비자 심리지수',
+    '실업률',
+    '2년 만기 미국 국채 수익률',
+    '10년 만기 미국 국채 수익률',
+    '금융스트레스지수',
+    '소비자 물가지수',
+    '5년 변동금리 모기지',
+    '미국 달러 환율',
+    '가계 부채 비율',
+    'GDP 성장률',
+    '나스닥 종합지수',
+    'S&P 500 지수',
+    '금 가격',
+    '달러 인덱스',
+    '나스닥 100',
+    'S&P 500 ETF',
+    # 'QQQ ETF',
+    '러셀 2000 ETF',
+    '다우 존스 ETF',
+    'VIX 지수'
+]
+
+train_size = int(len(data) * 0.8)
+train_data = data.iloc[:train_size]
+test_data = data.iloc[train_size:]
+
+data_scaled = data.copy()
+stock_scaler = MinMaxScaler() # 주식 데이터를 0과 1사이로 변환
+econ_scaler = MinMaxScaler() # 경제 지표를 0과 1사이로 변환
+
+data_scaled[target_columns] = stock_scaler.fit_transform(data[target_columns]) # 주식 관련 데이터를 0~1 범위로 정규화 
+data_scaled[economic_features] = econ_scaler.fit_transform(data[economic_features]) # 경제 지표 데이터를 0~1 범위로 정규화 
+
+lookback = 90 # 주가를 예측할 때 과거 90일을 기준
+
+x_stock_train = []
+x_econ_train = []
+y_train = []
+
+# 학습 데이터셋 생성성
+for i in range(lookback, len(data_scaled) - forecast_horizon): # i번째 샘플을 만들기 위해 90일 만큼 과거 데이터를 들고옴
+    x_stock_seq = data_scaled[target_columns].iloc[i - lookback:i].to_numpy() # 주가 데이터에서 90일 만큼 시퀀스를 추출
+    x_econ_seq = data_scaled[economic_features].iloc[i - lookback:i].to_numpy() # 경제 데이터에서 90일 만큼 시퀀ㅅ느를 추출 
+    y_val = data_scaled[target_columns].iloc[i + forecast_horizon - 1].to_numpy() # 예측할 타겟 값 (7일 만큼의 미래 주가 데이터)
+    x_stock_train.append(x_stock_seq)
+    x_econ_train.append(x_econ_seq)
+    y_train.append(y_val)
+
+x_stock_train = np.array(x_stock_train) # 시퀀스들을 numpy로 변환하여 모델에서 인자에 넣기 쉽도록 하기 위함
+x_econ_train = np.array(x_econ_train)
+y_train = np.array(y_train)
+
+# 전체 예측 데이터 생성
+
+x_stock_full = []
+x_econ_full = []
+
+for i in range(lookback, len([data_scaled])):
+    x_stock_seq = data_scaled[target_columns].iloc[i - lookback:i].to_numpy()
+    x_econ_seq = data_scaled[economic_features].iloc[i - lookback:i].to_numpy()
+    x_stock_full.append(x_stock_seq)
+    x_econ_full.append(x_econ_seq)
+    
+x_stock_full = np.array(x_stock_full)
+x_econ_full = np.array(x_econ_full)
+
+# 모델 학습
+
+stock_shape = (lookback, len(target_columns))
+econ_shape = (lookback, len(economic_features))
+
+model = build_transformer_with_two_inputs(stock_shape, econ_shape, num_heads=8, ff_dim=256, target_size=len(target_columns))
+model.compile(optimizer = Adam(learning_rate = 0.0001), loss='mse', metrics = ['mae'])
+model.summary()
