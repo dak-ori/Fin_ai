@@ -12,7 +12,7 @@ from tensorflow.keras.layers import ( # 멀티 헤드 어텐션은 Transformer �
     Input, Dense, Dropout, LayerNormalization, MultiHeadAttention, Add, GlobalAveragePooling1D)
 from tensorflow.keras.optimizers import Adam
 
-plt.rc('font', 'nanumgothic')
+plt.rc('font', family = 'nanumgothic')
 
 # Transformer Encoder 정의
 # 입력 데이터에 대해서 Self-Attention을 적용해 시계열 데이터의 패턴 파악
@@ -163,7 +163,7 @@ model.compile(optimizer = Adam(learning_rate = 0.0001), loss='mse', metrics = ['
 model.summary()
 
 # 모델 학습
-history = model.fit([X_stock_train, X_econ_train], y_train, epochs=5, batch_size=32, verbose = 1)
+history = model.fit([X_stock_train, X_econ_train], y_train, epochs=50, batch_size=32, verbose = 1)
 
 # 모델 예측
 predicted_prices = model.predict([X_stock_full, X_econ_full], verbose=1)
