@@ -1,3 +1,4 @@
+from tabnanny import verbose
 from google.colab import drive
 drive.mount('/content/drive')
 
@@ -123,7 +124,7 @@ x_stock_train = []
 x_econ_train = []
 y_train = []
 
-# 학습 데이터셋 생성성
+# 학습 데이터셋 생성
 for i in range(lookback, len(data_scaled) - forecast_horizon): # i번째 샘플을 만들기 위해 90일 만큼 과거 데이터를 들고옴
     x_stock_seq = data_scaled[target_columns].iloc[i - lookback:i].to_numpy() # 주가 데이터에서 90일 만큼 시퀀스를 추출
     x_econ_seq = data_scaled[economic_features].iloc[i - lookback:i].to_numpy() # 경제 데이터에서 90일 만큼 시퀀ㅅ느를 추출 
@@ -132,15 +133,15 @@ for i in range(lookback, len(data_scaled) - forecast_horizon): # i번째 샘플�
     x_econ_train.append(x_econ_seq)
     y_train.append(y_val)
 
+# numpy 배열로 변환
 x_stock_train = np.array(x_stock_train) # 시퀀스들을 numpy로 변환하여 모델에서 인자에 넣기 쉽도록 하기 위함
 x_econ_train = np.array(x_econ_train)
 y_train = np.array(y_train)
 
-# 전체 예측 데이터 생성
-
 x_stock_full = []
 x_econ_full = []
 
+# 전체 예측 데이터 생성
 for i in range(lookback, len([data_scaled])):
     x_stock_seq = data_scaled[target_columns].iloc[i - lookback:i].to_numpy()
     x_econ_seq = data_scaled[economic_features].iloc[i - lookback:i].to_numpy()
@@ -150,11 +151,63 @@ for i in range(lookback, len([data_scaled])):
 x_stock_full = np.array(x_stock_full)
 x_econ_full = np.array(x_econ_full)
 
-# 모델 학습
-
+# 입력 데이터 형태
 stock_shape = (lookback, len(target_columns))
 econ_shape = (lookback, len(economic_features))
 
+# 모델 생성
 model = build_transformer_with_two_inputs(stock_shape, econ_shape, num_heads=8, ff_dim=256, target_size=len(target_columns))
 model.compile(optimizer = Adam(learning_rate = 0.0001), loss='mse', metrics = ['mae'])
 model.summary()
+
+# 모델 학습
+history = model.fit([x_stock_train, x_econ_train], y_train, epochs=50, batch_size=32, verbose = 1)
+
+# 모델 예측
+predicted_prices = model.predict([x_stock_full, x_econ_full], verbose = 1)
+predicted_prices_actual = stock_scaler.inverse_transform(predicted_prices)
+pred_len = len(predicted_prices_actual)
+
+# 날짜 데이터 추출
+today_date = data['날짜'].iloc[lookback : lookback + pred_len].values
+
+# 실제 데이터 준비
+actual_data_end = min(lookback + pred_len, len(data)) # 실제 데이터의 끝 위치
+actual_full = data[target_columns].iloc[lookback:actual_data_end].values # 실제 주가 데이터
+
+# 길이 차이가 생기면 NaN으로 채움
+if actual_full.shape[0] < pred_len:
+    nan_padding = np.full([pred_len - actual_full.shape[0], len(target_columns)], np.nan)
+    actual_full = np.vstack([actual_full, nan_padding])
+
+# 결과 데이터프레임    
+result_data = pd.DataFrame({'날짜' : today_date})
+for idx, col in enumerate(target_columns):
+    result_data = [f'{col}_predicted'] = predicted_prices[:, idx]
+    result_data = [f'{col}_actual'] = actual_full[:, idx]
+
+# 날짜 형식 변환    
+result_data['날짜'] = pd.to_datetime(result_data['날짜'], errors = 'coerce')
+result_data['날짜'] = result_data['날짜'].dt.strftime("%Y-%m-%d")
+
+# 결과 저장
+output_file_path = '/content/drive/My drive/predicted_stock.csv'
+result_data.to_csv(output_file_path, index=False)
+print(f'{output_file_path}에 저장 완료')
+
+# 학습 손실 시각화
+plt.figure(figsize=(12,6))
+plt.plot(history.history['loss'], label = 'Train Loss')
+plt.title('학습 손실')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+# 실제 값과 예측 값 비교
+for col in target_columns:
+    plt.figure(figsize=(12, 6))
+    plt.plot(pd.to_datetime(result_data['날짜']), result_data[f'{col}_Actual'], label='오늘', alpha=0.7)
+    plt.plot(pd.to_datetime(result_data['날짜']), result_data[f'{col}_Predicted'], label='예측한 7일 뒤의 값', alpha=0.7)
+    plt.show()
+
