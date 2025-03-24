@@ -107,21 +107,24 @@ nasdaq_top_100 = [
     # ("LULU", "룰루레몬"), ("EBAY", "이베이"), ("CEG", "컨스텔레이션 에너지"), ("RIVN", "리비안")
 ]
 
-start_date = '2016-01-01'
+start_date = '2006-01-01'
 end_date = datetime.today().strftime('%Y-%m-%d')
 
+# FRED API를 통한 데이터 수집
 fred_data_frames = []
 for code, name in fred_indicators.items():
-    # 지표별 제공 주기에 따른 요청 주기를 설정
-    if code in ['FEDFUNDS', 'UMCSENT', 'PCE', 'INDPRO', 'HOUST', 'UNNEMPLOY',
-    'RSAFS', 'CPIENGSL', 'AHETPI', 'PPIACO', 'CPIAUCSL', 'CSUSHPINSA', 'DTWEXM', 'UNRATE']:
-        frequency = 'm' # 월간
-    elif code in ['STLFSI4', 'M2', 'MORTGAGE15US', 'MORTGAGE5US']:
-        frequency = 'w' # 주간
-    elif code in ['TDSP', 'A939RX0Q04BSBEA', 'GDPC1', 'W019RCQ027SBEA', 'DRBLACBS']:
-        frequency = 'q' # 분기
+    # 지표별 제공 주기에 따른 요청 주기 설정
+    if code in ['FEDFUNDS', 'UMCSENT', 'UNRATE', 'USREC', 'PCE', 'INDPRO',
+                'HOUST', 'UNEMPLOY', 'RSAFS', 'CPIENGSL', 'AHETPI', 'PPIACO', 'CPIAUCSL',
+                'CSUSHPINSA', 'DTWEXM']:
+        frequency = 'm'
+    elif code in ['STLFSI4', 'M2', 'MORTGAGE30US', 'MORTGAGE15US', 'MORTGAGE5US']:
+        frequency = 'w'
+    elif code in ['TDSP', 'A939RX0Q048SBEA', 'GDPC1', 'W019RCQ027SBEA', 'DRBLACBS']:
+        frequency = 'q'
     else:
-        frequency = 'd' # 일간
+        frequency = 'd'
+
 
     url = f'https://api.stlouisfed.org/fred/series/observations'
     params = {
@@ -148,52 +151,59 @@ for code, name in fred_indicators.items():
     else:
             print(f"fail {name} {(code)} : {response.status_code}")
 
-# 데이터 빈도에 따른 리샘플링
+# 데이터 빈도에 따른 리샘플링 처리
 for i, df in enumerate(fred_data_frames):
     if df.empty:
-        print(f"DataFrame {i} is Empty")
+        print(f"DataFrame {i} is empty, skipping resampling.")
         continue
-
     try:
         inferred_freq = df.index.inferred_freq
-        if inferred_freq in ['M', 'MS']: # 월간
+        # 빈도에 따라 일간 데이터로 변환
+        if inferred_freq in ['M', 'MS']:  # 월간 데이터
             fred_data_frames[i] = df.resample('D').ffill()
-        if inferred_freq in ['W', 'W-FRI']: # 주간
+        elif inferred_freq in ['W', 'W-FRI']:  # 주간 데이터
             fred_data_frames[i] = df.resample('D').ffill()
-        if inferred_freq in ['Q', 'Q5-QCT']: # 분기
+        elif inferred_freq in ['Q', 'QS-OCT']:  # 분기 데이터
             fred_data_frames[i] = df.resample('D').ffill()
-        if inferred_freq in ['B']: # 일간
+        elif inferred_freq in ['B']:  # 영업일 데이터
             fred_data_frames[i] = df.resample('D').ffill()
+        # else:
+        #     print(f"Unknown frequency for DataFrame {i}: {inferred_freq}")
         else:
             fred_data_frames[i] = df.resample('D').ffill()
     except Exception as e:
-        print(f"Error {i} : {e}")      
+        print(f"Error processing DataFrame {i}: {e}")
 
-# yfinance 를 통한 데이터 수집
+# yfinance를 통한 데이터 수집
 yfinance_data_frames = []
 for name, ticker in yfinance_indicators.items():
     df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
     if not df.empty:
-        # df = df[['Close']].rename(columns={'Close' : name}) # 종가 값만 추출
+        # df = df[['Close']].rename(columns={'Close': name})
+        # name만 사용하여 컬럼 이름 지정
         df = df[['Close']]
-        df.columns = [name] # rename 대신 직접 columns 할당
-        df.index = df.index.tz_localize(None)
+        df.columns = [name]  # rename 대신 직접 columns 할당
+        df.index = df.index.tz_localize(None)  
         yfinance_data_frames.append(df)
     else:
-        print(f"No data {name} ({ticker})")
+        print(f"No data found for indicator {name} ({ticker}).")
 
-# 나스닥 상위 종목 데이터 수집
+# --------------------------
+# 나스닥 100 상위 종목 데이터 수집
+# --------------------------
 nasdaq_data_frames = []
 for ticker, name in nasdaq_top_100:
-    df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
-    if not df.empty:
-        # df = df[['Close']].rename(columns={'Close' : name})
-        df = df[['Close']]
-        df.columns = [name] # rename 대신 직접 columns 할당
-        df.index = df.index.tz_localize(None)
-        nasdaq_data_frames.append(df)
-    else:
-        print(f"No data {name} {(ticker)}")
+    try:
+        df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
+        if not df.empty:
+            #df = df[['Close']].rename(columns={'Close': f"{name}"})
+            df = df[['Close']]
+            df.columns = [name]  # rename 대신 직접 columns 할당
+            df.index = df.index.tz_localize(None)
+            nasdaq_data_frames.append(df)
+    except Exception as e:
+        print(f"Error downloading data for {ticker} ({name}): {e}")
+
         
 # 데이터 병합
 all_data_frames = fred_data_frames + yfinance_data_frames + nasdaq_data_frames
