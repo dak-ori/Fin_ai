@@ -204,7 +204,7 @@ if all_data_frames:
     
     # 결측치 및 비정상적인 값을 처리
     result_df.replace('.', pd.NA, inplace=True)
-    result_df = result_df.dropna(subset=['10년 기대 인플레이션율', '장단기 금리차', '금융스트레스지수', '5년 변동금리 모기지'], how='any')
+    result_df = result_df.dropna(subset=['10년 기대 인플레이션율', '장단기 금리차'], how='any')
     
     # 결측치를 이전 값으로 채우기
     result_df.sort_index(inplace=True)

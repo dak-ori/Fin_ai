@@ -183,8 +183,8 @@ if actual_full.shape[0] < pred_len:
 # 결과 데이터프레임    
 result_data = pd.DataFrame({'날짜' : today_date})
 for idx, col in enumerate(target_columns):
-    result_data = [f'{col}_predicted'] = predicted_prices[:, idx]
-    result_data = [f'{col}_actual'] = actual_full[:, idx]
+    result_data[f'{col}_Predicted'] = predicted_prices_actual[:, idx]
+    result_data[f'{col}_Actual'] = actual_full[:, idx]
 
 # 날짜 형식 변환    
 result_data['날짜'] = pd.to_datetime(result_data['날짜'], errors = 'coerce')
